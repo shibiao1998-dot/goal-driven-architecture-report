@@ -1,0 +1,1302 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 项目平台架构改造方案</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* 版式：纸面式方案报告。宽屏左侧固定目录，正文单栏；章节编号、图表编号按报告惯例；打印为 A4。 */
+:root {
+  --bg: #eceff3;
+  --paper: #ffffff;
+  --paper-2: #f5f7f9;
+  --band: #f6f8fb;
+  --ink: #171c24;
+  --ink-2: #434b59;
+  --ink-3: #6b7381;
+  --rule: #dde1e7;
+  --rule-strong: #bcc4cf;
+  --a: #1f4fbf;
+  --a-tint: #e8eefb;
+  --b: #9a5b00;
+  --b-tint: #fbf1dc;
+  --cur: #5f6673;
+  --cur-tint: #eceef1;
+  --warn: #b42318;
+  --warn-tint: #fdeceb;
+  --ok: #14734a;
+  --ok-tint: #e2f3e9;
+  --serif: "Noto Serif SC", "Songti SC", "STSong", "SimSun", serif;
+  --sans: "Noto Sans SC", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0b1017; --paper: #131a24; --paper-2: #18212d; --band: #161e29; --ink: #e6ebf2; --ink-2: #b5bfcc; --ink-3: #8b96a5;
+    --rule: #253042; --rule-strong: #384559; --a: #7aa5ff; --a-tint: #172848; --b: #e6b25a; --b-tint: #33270f;
+    --cur: #a3acb9; --cur-tint: #1f2733; --warn: #ff8a7a; --warn-tint: #3a1a17; --ok: #55c891; --ok-tint: #123222; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0b1017; --paper: #131a24; --paper-2: #18212d; --band: #161e29; --ink: #e6ebf2; --ink-2: #b5bfcc; --ink-3: #8b96a5;
+  --rule: #253042; --rule-strong: #384559; --a: #7aa5ff; --a-tint: #172848; --b: #e6b25a; --b-tint: #33270f;
+  --cur: #a3acb9; --cur-tint: #1f2733; --warn: #ff8a7a; --warn-tint: #3a1a17; --ok: #55c891; --ok-tint: #123222; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15.5px; line-height: 1.8; -webkit-font-smoothing: antialiased; }
+p { margin: 0; }
+a { color: var(--a); }
+h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.layout { max-width: 1240px; margin: 0 auto; padding: 32px 24px 80px; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
+.toc-side { position: sticky; top: 24px; font-size: 13.5px; }
+.toc-side .toc-title { font-size: 12px; color: var(--ink-3); letter-spacing: .08em; margin-bottom: 8px; }
+.toc-side ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.toc-side a { display: grid; grid-template-columns: 22px minmax(0, 1fr); padding: 5px 8px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
+.toc-side a:hover { background: var(--paper); color: var(--ink); }
+.toc-side a span:first-child { font-family: var(--mono); color: var(--ink-3); }
+.paper { background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 56px 64px 64px; min-width: 0; display: flex; flex-direction: column; gap: 56px; }
+
+/* 封面 */
+.cover { display: flex; flex-direction: column; gap: 14px; padding-bottom: 32px; border-bottom: 2px solid var(--ink); }
+.kicker { display: inline-flex; align-self: flex-start; align-items: center; height: 26px; padding: 0 10px; border: 1px solid var(--ink); font-size: 13px; letter-spacing: .12em; }
+.cover h1 { font-family: var(--serif); font-size: 38px; line-height: 1.3; font-weight: 700; letter-spacing: .02em; }
+.cover .sub { font-family: var(--serif); font-size: 19px; color: var(--ink-2); font-weight: 600; }
+.cover .meta { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13.5px; color: var(--ink-3); }
+.toc-inline { display: none; }
+
+/* 章节 */
+.chap { display: flex; flex-direction: column; gap: 20px; scroll-margin-top: 20px; }
+.chap > h2 { font-family: var(--serif); font-size: 26px; line-height: 1.4; font-weight: 700; display: flex; gap: 14px; align-items: baseline; padding-bottom: 10px; border-bottom: 1px solid var(--rule-strong); }
+.chap > h2 .no { font-family: var(--mono); font-size: 20px; color: var(--a); font-weight: 500; }
+.sec { display: flex; flex-direction: column; gap: 14px; }
+.sec > h3 { font-size: 17.5px; font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.sec > h3 .no { font-family: var(--mono); font-size: 14px; color: var(--ink-3); font-weight: 500; }
+.lead { font-size: 16.5px; color: var(--ink); }
+.body-text { display: flex; flex-direction: column; gap: 10px; color: var(--ink-2); }
+.body-text b, .body-text strong { color: var(--ink); }
+
+/* 关键数字 */
+.stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.stat { padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--rule); min-width: 0; }
+.stat:last-child { border-right: 0; }
+.stat b { font-family: var(--mono); font-size: 26px; font-weight: 500; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 12.5px; color: var(--ink-3); }
+.stat.old b { color: var(--cur); }
+
+/* 要点列表 */
+.points { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.points li { padding: 12px 16px; border-left: 3px solid var(--a); background: var(--paper-2); border-radius: 0 6px 6px 0; color: var(--ink-2); }
+.points li b { color: var(--ink); margin-right: 4px; }
+.olist { margin: 0; padding-left: 1.6em; display: flex; flex-direction: column; gap: 8px; color: var(--ink-2); }
+.olist li::marker { font-family: var(--mono); color: var(--ink-3); }
+.olist b { color: var(--ink); }
+.scope { font-size: 14px; color: var(--ink-2); padding: 12px 16px; border: 1px dashed var(--rule-strong); border-radius: 6px; }
+.scope b { color: var(--ink); }
+
+/* 方案色标 */
+.pl { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; white-space: nowrap; }
+.pl::before { content: ""; width: 9px; height: 9px; border-radius: 2px; background: currentColor; }
+.pl-cur { color: var(--cur); }
+.pl-b { color: var(--b); }
+.pl-a { color: var(--a); }
+
+/* 表格 */
+.tbl { display: flex; flex-direction: column; gap: 8px; }
+.tbl .cap, figcaption .cap { font-size: 13.5px; font-weight: 700; color: var(--ink); }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.7; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
+thead th { font-size: 12.5px; font-weight: 600; color: var(--ink-3); background: var(--paper-2); white-space: nowrap; }
+tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
+tbody th { font-weight: 600; color: var(--ink); white-space: nowrap; background: var(--paper); }
+td { color: var(--ink-2); }
+td.col-a, th.col-a { background: var(--a-tint); color: var(--ink); }
+thead th.col-a { color: var(--a); }
+.cmp td, .cmp th { min-width: 9.5em; }
+.cmp tbody th { min-width: 7em; }
+.cmp tbody th, .cases tbody th, .objs tbody th { white-space: normal; width: 9em; }
+.objs td:nth-child(2) { min-width: 15em; }
+.roles td:nth-child(2) { min-width: 18em; }
+.cases td { min-width: 14em; }
+
+/* 图 */
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; break-inside: avoid; }
+.fig-box { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; padding: 16px; background: var(--paper); }
+.fig-box svg { display: block; width: 100%; height: auto; min-width: 760px; }
+figcaption { font-size: 14px; color: var(--ink-2); display: flex; flex-direction: column; gap: 2px; }
+.dg { font-family: var(--sans); }
+.dg .box { fill: var(--paper); stroke: var(--rule-strong); stroke-width: 1; }
+.dg .box.muted { fill: var(--paper-2); stroke-dasharray: 4 3; }
+.dg .box.goal, .dg .box.new { fill: var(--a-tint); stroke: var(--a); }
+.dg .box.ok { fill: var(--ok-tint); stroke: var(--ok); }
+.dg .box.hop { fill: var(--b-tint); stroke: var(--b); stroke-dasharray: 5 3; }
+.dg .box.warn, .dg .callout { fill: var(--warn-tint); stroke: var(--warn); }
+.dg .box.dash { stroke-dasharray: 4 3; }
+.dg .band { fill: var(--band); stroke: var(--rule); }
+.dg .panel-cur { fill: none; stroke: var(--cur); stroke-width: 1.2; }
+.dg .panel-b { fill: none; stroke: var(--b); stroke-width: 1.2; }
+.dg .panel-a { fill: none; stroke: var(--a); stroke-width: 2.4; }
+.dg .t-head { font-size: 15px; font-weight: 700; fill: var(--ink); }
+.dg .t-title { font-size: 13.5px; font-weight: 600; fill: var(--ink); }
+.dg .t-sub { font-size: 12px; fill: var(--ink-2); }
+.dg .t-col { font-size: 12.5px; font-weight: 600; fill: var(--ink-3); letter-spacing: .08em; }
+.dg .t-edge { font-size: 11.5px; fill: var(--ink-3); }
+.dg .t-num { font-family: var(--mono); font-size: 12px; fill: var(--ink-3); }
+.dg .t-big { font-family: var(--mono); font-size: 20px; font-weight: 500; fill: var(--ink); }
+.dg .t-chip { font-size: 11.5px; font-weight: 600; }
+.dg .t-a { fill: var(--a); }
+.dg .t-b { fill: var(--b); }
+.dg .t-cur { fill: var(--cur); }
+.dg .t-warn { fill: var(--warn); }
+.dg .t-ok { fill: var(--ok); }
+.dg .w600 { font-weight: 600; }
+.dg .conn { stroke: var(--ink-3); stroke-width: 1.3; fill: none; }
+.dg .conn.a { stroke: var(--a); stroke-width: 2; }
+.dg .conn.ok { stroke: var(--ok); stroke-width: 2; }
+.dg .conn.warn { stroke: var(--warn); stroke-width: 1.6; }
+.dg .conn.dash { stroke-dasharray: 4 3; }
+.dg .ah { fill: var(--ink-3); }
+.dg .ah-a { fill: var(--a); }
+.dg .ah-ok { fill: var(--ok); }
+.dg .ah-warn { fill: var(--warn); }
+.dg .fill-warn { fill: var(--warn); }
+.dg .chip-a { fill: var(--a-tint); stroke: var(--a); }
+.dg .chip-n { fill: var(--ok-tint); stroke: var(--ok); }
+.dg .chip-c { fill: var(--warn-tint); stroke: var(--warn); }
+.dg .daily { stroke: var(--ink-3); stroke-width: 12; stroke-dasharray: 1.3 1.96; opacity: .55; fill: none; }
+.dg .grid { stroke: var(--rule); stroke-width: 1; }
+.dg .axis { stroke: var(--rule-strong); stroke-width: 1; }
+.dg .bar-a { fill: var(--a-tint); stroke: var(--a); }
+.dg .bar-v { fill: var(--paper-2); stroke: var(--rule-strong); }
+.dg .ms { fill: var(--b); }
+
+/* 项目去向条 */
+.bar { display: flex; height: 34px; border-radius: 6px; overflow: hidden; border: 1px solid var(--rule); }
+.bar span { display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 13px; font-weight: 500; color: var(--ink); min-width: 0; }
+.bar .b1 { background: var(--a-tint); }
+.bar .b2 { background: var(--b-tint); }
+.bar .b3 { background: var(--cur-tint); }
+.bar .b1x { background: repeating-linear-gradient(135deg, var(--a-tint) 0 6px, var(--paper) 6px 10px); }
+.bar .b2x { background: repeating-linear-gradient(135deg, var(--b-tint) 0 6px, var(--paper) 6px 10px); }
+.bar-legend.legend-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.bar-legend i.sw-a { background: repeating-linear-gradient(135deg, var(--a-tint) 0 3px, var(--paper) 3px 5px); border: 1px dashed var(--a); }
+.bar-legend i.sw-b { background: repeating-linear-gradient(135deg, var(--b-tint) 0 3px, var(--paper) 3px 5px); border: 1px dashed var(--b); }
+.dirs td.num, .dirs th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.dirs tr.sum th, .dirs tr.sum td { font-weight: 600; color: var(--ink); background: var(--paper-2); }
+.bar-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; font-size: 13.5px; color: var(--ink-2); }
+.bar-legend div { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.bar-legend i { flex: none; width: 10px; height: 10px; border-radius: 2px; transform: translateY(1px); }
+.bar-legend b { font-family: var(--mono); font-weight: 500; color: var(--ink); }
+
+/* 问题卡 */
+.issues { display: flex; flex-direction: column; gap: 14px; }
+.issue { border: 1px solid var(--rule); border-radius: 8px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.issue h4 { font-size: 15.5px; font-weight: 700; display: flex; gap: 10px; align-items: baseline; }
+.issue h4 .no { font-family: var(--mono); color: var(--warn); font-weight: 500; }
+.issue ul { margin: 0; padding-left: 1.2em; display: flex; flex-direction: column; gap: 6px; color: var(--ink-2); font-size: 14.5px; }
+
+/* 流向条 */
+.flows { display: flex; flex-direction: column; gap: 12px; }
+.flow { border: 1px solid var(--rule); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.flow-head { font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.flow-head i { width: 10px; height: 10px; border-radius: 50%; }
+.flow ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; font-size: 13.5px; }
+.flow ol li { display: inline-flex; align-items: center; gap: 4px; }
+.flow ol li span { padding: 3px 10px; border-radius: 4px; background: var(--paper-2); border: 1px solid var(--rule); color: var(--ink); white-space: nowrap; }
+.flow ol li + li::before { content: "→"; color: var(--ink-3); padding: 0 2px; }
+.flow.up ol li + li::before { content: "→"; }
+.flow p { font-size: 14px; color: var(--ink-2); }
+
+/* 附录 */
+.terms { margin: 0; display: grid; grid-template-columns: 9em minmax(0, 1fr); border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; font-size: 14px; }
+.terms dt, .terms dd { margin: 0; padding: 9px 14px; border-bottom: 1px solid var(--rule); }
+.terms dt { font-weight: 600; background: var(--paper-2); }
+.terms dd { color: var(--ink-2); }
+.terms dt:nth-last-of-type(1), .terms dd:last-child { border-bottom: 0; }
+.src { margin: 0; padding-left: 1.2em; font-size: 14px; color: var(--ink-2); display: flex; flex-direction: column; gap: 4px; }
+.endnote { font-size: 12.5px; color: var(--ink-3); border-top: 1px solid var(--rule); padding-top: 14px; }
+
+a:focus-visible { outline: 2px solid var(--a); outline-offset: 2px; border-radius: 4px; }
+
+@media (max-width: 1100px) {
+  .layout { grid-template-columns: minmax(0, 1fr); padding: 24px 16px 64px; }
+  .toc-side { display: none; }
+  .toc-inline { display: block; }
+  .paper { padding: 40px 32px 48px; }
+}
+@media (max-width: 760px) {
+  .layout { padding: 0 0 48px; }
+  .paper { border-radius: 0; border-left: 0; border-right: 0; padding: 28px 16px 40px; gap: 44px; }
+  .cover h1 { font-size: 29px; }
+  .cover .sub { font-size: 17px; }
+  .chap > h2 { font-size: 22px; }
+  .stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stat:nth-child(3) { border-right: 0; }
+  .stat:nth-child(-n+3) { border-bottom: 1px solid var(--rule); }
+  .bar-legend, .bar-legend.legend-4 { grid-template-columns: 1fr; }
+  .dirs { min-width: 480px; }
+  .dirs tbody th { white-space: normal; width: 8em; }
+  .terms { grid-template-columns: 1fr; }
+  .cmp th:first-child, .cases th:first-child, .objs th:first-child, .dirs th:first-child { position: sticky; left: 0; z-index: 1; box-shadow: 1px 0 0 var(--rule); }
+  .terms dt { border-bottom: 0; padding-bottom: 2px; }
+}
+.toc-inline ol { margin: 8px 0 0; padding-left: 1.4em; columns: 2; column-gap: 32px; font-size: 14.5px; }
+.toc-inline .toc-title { font-size: 12.5px; color: var(--ink-3); letter-spacing: .08em; }
+@media (max-width: 560px) { .toc-inline ol { columns: 1; } }
+
+@media print {
+  @page { size: A4; margin: 14mm 12mm; }
+  body { background: #fff; font-size: 11pt; }
+  .layout { display: block; padding: 0; max-width: none; }
+  .toc-side { display: none; }
+  .toc-inline { display: block; }
+  .paper { border: 0; padding: 0; gap: 28px; }
+  .chap { break-before: page; }
+  .chap.first { break-before: auto; }
+  .fig-box { overflow: visible; border-color: #ccc; }
+  .fig-box svg { min-width: 0; }
+  .tbl-wrap { overflow: visible; }
+  tr, .issue, .points li, .flow { break-inside: avoid; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<aside class="toc-side" aria-label="目录">
+  <div class="toc-title">目录</div>
+  <ol>
+    <li><a href="#s1"><span>1</span><span>摘要</span></a></li>
+    <li><a href="#s2"><span>2</span><span>现状与问题</span></a></li>
+    <li><a href="#s3"><span>3</span><span>改造目标与设计原则</span></a></li>
+    <li><a href="#s4"><span>4</span><span>方案 A 总体架构</span></a></li>
+    <li><a href="#s5"><span>5</span><span>核心对象与目标链</span></a></li>
+    <li><a href="#s6"><span>6</span><span>运行机制</span></a></li>
+    <li><a href="#s7"><span>7</span><span>组织与角色</span></a></li>
+    <li><a href="#s8"><span>8</span><span>方案对比</span></a></li>
+    <li><a href="#s9"><span>9</span><span>方案 A 的取舍</span></a></li>
+    <li><a href="#appx"><span>附</span><span>术语与数据来源</span></a></li>
+  </ol>
+</aside>
+
+<main class="paper">
+
+<header class="cover">
+  <span class="kicker">方案报告</span>
+  <h1>AI 项目平台架构改造方案</h1>
+  <p class="sub">从项目集到目标驱动：方案 A 终态架构</p>
+  <div class="meta">
+    <span>2026 年 11 月 2 日</span>
+    <span>数据：战略方向文档 1.0（11 月 2 日）；平台项目快照（10 月 29 日）</span>
+  </div>
+  <nav class="toc-inline" aria-label="目录">
+    <div class="toc-title">目录</div>
+    <ol>
+      <li><a href="#s1">摘要</a></li>
+      <li><a href="#s2">现状与问题</a></li>
+      <li><a href="#s3">改造目标与设计原则</a></li>
+      <li><a href="#s4">方案 A 总体架构</a></li>
+      <li><a href="#s5">核心对象与目标链</a></li>
+      <li><a href="#s6">运行机制</a></li>
+      <li><a href="#s7">组织与角色</a></li>
+      <li><a href="#s8">方案对比</a></li>
+      <li><a href="#s9">方案 A 的取舍</a></li>
+      <li><a href="#appx">附录：术语与数据来源</a></li>
+    </ol>
+  </nav>
+</header>
+
+<section class="chap first" id="s1" aria-labelledby="s1-h">
+  <h2 id="s1-h"><span class="no">1</span>摘要</h2>
+  <div class="body-text">
+    <p class="lead">AI 项目平台现在用项目集组织项目。项目分为母项目和子项目两层，子项目只能从母项目的中短期目标拿到目标。</p>
+    <p>战略工作台已经发布战略方向文档 1.0。文档写明了战略方向、方向目标、业务和业务目标。这些目标还没有和平台上的项目连上。</p>
+    <p>本方案拿掉项目集，改为目标驱动的结构：<b>战略方向 → 方向目标 → 业务 → 业务目标 → 项目</b>。目标从上往下派，项目的成绩按目标往上汇总。</p>
+    <p>项目范围以 1.0 的项目清单为准，共 237 个项目，含尚未从旧官网迁入平台的 98 个。</p>
+  </div>
+  <div class="stats" role="list" aria-label="规模">
+    <div class="stat" role="listitem"><b>14</b><span>战略方向</span></div>
+    <div class="stat" role="listitem"><b>79</b><span>方向目标</span></div>
+    <div class="stat" role="listitem"><b>43</b><span>业务</span></div>
+    <div class="stat" role="listitem"><b>192</b><span>业务目标</span></div>
+    <div class="stat" role="listitem"><b>237</b><span>纳入范围的项目</span></div>
+    <div class="stat old" role="listitem"><b>12</b><span>现有项目集</span></div>
+  </div>
+  <ul class="points">
+    <li><b>业务取代项目集。</b>业务是范围边界，也是组织边界。人员名单、立项审核和项目结项都按业务管理。</li>
+    <li><b>项目只有一种。</b>每个项目直接承接业务目标，自带理想化状态、核心价值、目标用户和中短期目标，按版本执行。</li>
+    <li><b>目标往下，成绩往上。</b>战略方向文档的改动直接传到项目。项目的成绩按业务目标和方向目标汇总。</li>
+    <li><b>AI 起草，人决定。</b>各层目标的生成和调整由 AI 起草，项目主创逐条决定。</li>
+  </ul>
+  <div class="body-text">
+    <p>备选的方案 B 保留母项目和子项目两层，另外允许没有母项目的独立项目直接承接业务目标。三种结构的主要区别见表 1，完整对比见第 8 章。</p>
+  </div>
+  <div class="tbl">
+    <div class="cap">表 1　方案 A 与现状、方案 B 的主要区别</div>
+    <div class="tbl-wrap">
+      <table class="cmp">
+        <thead><tr><th scope="col">对比项</th><th scope="col"><span class="pl pl-cur">现状</span></th><th scope="col"><span class="pl pl-b">方案 B</span></th><th scope="col" class="col-a"><span class="pl pl-a">方案 A</span></th></tr></thead>
+        <tbody>
+          <tr><th scope="row">项目种类</th><td>2 种：母项目、子项目</td><td>3 种：母项目、子项目、独立项目</td><td class="col-a">1 种</td></tr>
+          <tr><th scope="row">项目的上层目标</th><td>母项目的中短期目标</td><td>业务目标，或母项目的中短期目标</td><td class="col-a">业务目标</td></tr>
+          <tr><th scope="row">有完整目标链的项目</th><td>没有</td><td>只有独立项目</td><td class="col-a">全部项目</td></tr>
+          <tr><th scope="row">战略调整传到项目</th><td>没有连上</td><td>先改母项目，再传到子项目</td><td class="col-a">直接改项目的中短期目标</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p class="scope"><b>报告范围：</b>本报告只描述改造完成后的结构和运行方式，覆盖 1.0 列出的全部 237 个项目。项目怎样归入业务、旧官网项目怎样迁入、角色怎样交接、功能按什么顺序改造，另行安排。</p>
+</section>
+
+<section class="chap" id="s2" aria-labelledby="s2-h">
+  <h2 id="s2-h"><span class="no">2</span>现状与问题</h2>
+
+  <div class="sec">
+    <h3><span class="no">2.1</span>现状结构</h3>
+    <div class="body-text">
+      <p>平台现在有三层：项目集、母项目、子项目。项目集只写定义和边界，没有目标。母项目写理想化状态、核心价值、目标用户和中短期目标，不拆版本和事务。子项目承接母项目的一条中短期目标，按版本执行。</p>
+      <p>战略方向文档 1.0 已经导入生产。项目集、母项目和子项目都还没有和它连上。</p>
+    </div>
+    <figure>
+      <div class="fig-box">
+        <svg class="dg" viewBox="0 0 880 322" role="img" aria-label="现在的三层结构：项目集包含母项目，子项目承接母项目的中短期目标。三个真实项目分别卡在项目集、母项目和承接这三处。">
+          <defs>
+            <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+          </defs>
+          <rect class="box" x="40" y="16" width="320" height="60" rx="8"/>
+          <text class="t-title" x="60" y="41">项目集</text>
+          <text class="t-sub" x="60" y="63">扁平，不能嵌套 · 现有 12 个</text>
+          <line class="conn" x1="200" y1="76" x2="200" y2="110" marker-end="url(#m1)"/>
+          <text class="t-edge" x="190" y="98" text-anchor="end">包含</text>
+          <rect class="box hop" x="40" y="112" width="320" height="78" rx="8"/>
+          <text class="t-title" x="60" y="137">母项目（规划型）</text>
+          <text class="t-sub" x="60" y="158">理想化状态 · 核心价值 · 目标用户 · 中短期目标</text>
+          <text class="t-sub t-warn" x="60" y="178">不拆版本和事务</text>
+          <line class="conn" x1="200" y1="190" x2="200" y2="236" marker-end="url(#m1)"/>
+          <text class="t-edge" x="190" y="217" text-anchor="end">承接母项目的中短期目标</text>
+          <rect class="box" x="40" y="238" width="320" height="72" rx="8"/>
+          <text class="t-title" x="60" y="263">子项目（执行型）</text>
+          <text class="t-sub" x="60" y="286">版本（每个 30 天）· 阶段结项目标 · 事务</text>
+
+          <rect class="callout" x="470" y="16" width="394" height="64" rx="8"/>
+          <text class="t-title" x="488" y="41">Open-Q：旧官网是多层项目集</text>
+          <text class="t-sub" x="488" y="63">平台合并为 1 个项目集、4 个母项目；项目分属 6 项业务</text>
+          <line class="conn warn" x1="470" y1="48" x2="364" y2="46"/>
+          <circle class="fill-warn" cx="362" cy="46" r="3.5"/>
+
+          <rect class="callout" x="470" y="112" width="394" height="78" rx="8"/>
+          <text class="t-title" x="488" y="137">虚拟主播unreal版本：迁入时没有上级</text>
+          <text class="t-sub" x="488" y="158">被定成母项目，又没有子项目</text>
+          <text class="t-sub" x="488" y="178">目标停在中短期目标。同类在用项目还有 4 个</text>
+          <line class="conn warn" x1="470" y1="151" x2="364" y2="151"/>
+          <circle class="fill-warn" cx="362" cy="151" r="3.5"/>
+
+          <rect class="callout" x="470" y="210" width="394" height="100" rx="8"/>
+          <text class="t-title" x="488" y="235">北大尚教授合作：子项目没有承接</text>
+          <text class="t-sub" x="488" y="256">版本验收后，下一版本开不出来</text>
+          <text class="t-sub" x="488" y="276">平台每小时重试一次，不通知人</text>
+          <text class="t-sub" x="488" y="296">提示写成「中短期目标的时间周期尚未确认」</text>
+          <line class="conn warn" x1="470" y1="228" x2="210" y2="213"/>
+          <line class="conn warn" x1="194" y1="207" x2="206" y2="219"/>
+          <line class="conn warn" x1="206" y1="207" x2="194" y2="219"/>
+        </svg>
+      </div>
+      <figcaption><span class="cap">图 1　现在的结构与三个卡住的项目</span><span>三处都卡在同一条规则上：项目的上层目标只能来自母项目的中短期目标。</span></figcaption>
+    </figure>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">2.2</span>项目范围</h3>
+    <div class="body-text">
+      <p>本方案的项目范围是战略方向文档 1.0 列出的 237 个项目。1.0 从旧官网筛出这些项目：正式立项、执行中，并属于教育业务或非游业务。</p>
+      <p>237 个项目中，134 个分属 43 项业务，103 个属于 1.0「明确不做」的内容。按 10 月 29 日的平台快照，139 个已在平台上，98 个尚未从旧官网迁入。</p>
+    </div>
+    <div class="bar" role="img" aria-label="237 个项目：业务内 134 个，其中 60 个已在平台上、74 个尚未迁入；明确不做 103 个，其中 79 个已在平台上、24 个尚未迁入">
+      <span class="b1" style="width:25.32%">60</span>
+      <span class="b1x" style="width:31.22%">74</span>
+      <span class="b2" style="width:33.33%">79</span>
+      <span class="b2x" style="width:10.13%">24</span>
+    </div>
+    <div class="bar-legend legend-4">
+      <div><i style="background:var(--a-tint);border:1px solid var(--a)"></i><span><b>60</b> 个在业务内，已在平台上。</span></div>
+      <div><i class="sw-a"></i><span><b>74</b> 个在业务内，尚未迁入平台。</span></div>
+      <div><i style="background:var(--b-tint);border:1px solid var(--b)"></i><span><b>79</b> 个属于明确不做，已在平台上，全部在「DJ个人项目」项目集。</span></div>
+      <div><i class="sw-b"></i><span><b>24</b> 个属于明确不做，尚未迁入平台。</span></div>
+    </div>
+    <div class="tbl">
+      <div class="cap">表 2　各战略方向的业务和项目</div>
+      <div class="tbl-wrap">
+        <table class="dirs">
+          <thead><tr><th scope="col">战略方向</th><th scope="col">类别</th><th scope="col" class="num">业务</th><th scope="col" class="num">项目</th><th scope="col" class="num">已在平台上</th><th scope="col" class="num">尚未迁入</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">组织AI化</th><td>主战场</td><td class="num">5</td><td class="num">11</td><td class="num">6</td><td class="num">5</td></tr>
+            <tr><th scope="row">AI教育</th><td>主战场</td><td class="num">9</td><td class="num">56</td><td class="num">34</td><td class="num">22</td></tr>
+            <tr><th scope="row">AI事务工具</th><td>主战场</td><td class="num">8</td><td class="num">25</td><td class="num">15</td><td class="num">10</td></tr>
+            <tr><th scope="row">AI娱乐</th><td>主战场</td><td class="num">5</td><td class="num">20</td><td class="num">4</td><td class="num">16</td></tr>
+            <tr><th scope="row">职业教育办学与教学实践</th><td>其他板块</td><td class="num">4</td><td class="num">7</td><td class="num">0</td><td class="num">7</td></tr>
+            <tr><th scope="row">面向院校和机构的平台与服务</th><td>其他板块</td><td class="num">4</td><td class="num">6</td><td class="num">0</td><td class="num">6</td></tr>
+            <tr><th scope="row">国内区域教育</th><td>其他板块</td><td class="num">6</td><td class="num">7</td><td class="num">0</td><td class="num">7</td></tr>
+            <tr><th scope="row">资本运作与外部合作</th><td>其他板块</td><td class="num">2</td><td class="num">2</td><td class="num">1</td><td class="num">1</td></tr>
+            <tr><th scope="row">其余 6 个方向</th><td>2 个主战场、4 个其他板块</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">0</td></tr>
+            <tr class="sum"><th scope="row">业务内小计</th><td></td><td class="num">43</td><td class="num">134</td><td class="num">60</td><td class="num">74</td></tr>
+            <tr><th scope="row">明确不做</th><td>—</td><td class="num">—</td><td class="num">103</td><td class="num">79</td><td class="num">24</td></tr>
+            <tr class="sum"><th scope="row">合计</th><td></td><td class="num">43</td><td class="num">237</td><td class="num">139</td><td class="num">98</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="body-text">
+      <p>平台上另有 19 个在用项目不在 1.0 里，含少量验收测试项目。</p>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">2.3</span>主要问题</h3>
+    <div class="issues">
+      <div class="issue">
+        <h4><span class="no">问题一</span>项目集和业务对不上</h4>
+        <ul>
+          <li>1.0 有 43 项业务，平台有 12 个项目集。两者是多对多关系：Open-Q 项目集的项目分属 6 项业务，AI员工项目集分属 5 项，管理AI化项目集分属 2 项。</li>
+          <li>母项目和业务也对不上。在用子项目中，有 47 个能在 1.0 的业务清单里找到；其中 22 个不属于母项目所在的业务。</li>
+        </ul>
+      </div>
+      <div class="issue">
+        <h4><span class="no">问题二</span>目标只有一个来源，项目会卡住</h4>
+        <ul>
+          <li>子项目只能从母项目的中短期目标拿到目标。母项目没有给出可承接的目标，子项目就开不出下一个版本。北大尚教授合作就停在这里。</li>
+          <li>迁入时没有合格上级的项目被定成母项目。母项目不拆版本和事务；没有子项目时，目标停在中短期目标。虚拟主播unreal版本和另外 4 个在用项目是这种情况。</li>
+          <li>卡住的项目每小时重试一次，不通知人。给项目主创的提示写成「中短期目标的时间周期尚未确认」，与真实原因不符。</li>
+        </ul>
+      </div>
+      <div class="issue">
+        <h4><span class="no">问题三</span>战略的取舍到不了项目</h4>
+        <ul>
+          <li>1.0 对 6 项业务的取舍结论是「退出」，这 6 项业务列有 13 个项目。其中 7 个已在平台上，平台不会因此提醒任何人。</li>
+          <li>43 项业务都列有项目，但只有 15 项在平台上有项目。其余 28 项的项目都还在旧官网。</li>
+          <li>平台上的 158 个在用项目中，只有 60 个能挂到业务目标上。另外 79 个属于明确不做，19 个不在 1.0 里。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="chap" id="s3" aria-labelledby="s3-h">
+  <h2 id="s3-h"><span class="no">3</span>改造目标与设计原则</h2>
+  <div class="body-text">
+    <p class="lead">改造的目标是：把战略方向文档的目标一层层传到项目，把项目的成绩按目标汇总回来。</p>
+  </div>
+  <ol class="olist">
+    <li><b>以战略方向和业务目标为范围边界。</b>平台上的每个项目都在某项业务的业务目标之下。</li>
+    <li><b>立项必须挂在业务目标下。</b>新项目按所挂的业务目标判断立项价值。</li>
+    <li><b>每个项目有完整目标链。</b>从理想化状态到事务，项目不依赖上级项目给目标。</li>
+    <li><b>同一内容只在一处定义。</b>业务和业务目标的内容以战略方向文档为准，平台不另存一份。</li>
+    <li><b>AI 起草，人决定，人不作卡点。</b>AI 起草目标和调整建议。需要人判断的，在单据上逐条决定；只需知悉的，发知照单。</li>
+  </ol>
+</section>
+
+<section class="chap" id="s4" aria-labelledby="s4-h">
+  <h2 id="s4-h"><span class="no">4</span>方案 A 总体架构</h2>
+
+  <div class="sec">
+    <h3><span class="no">4.1</span>总体结构</h3>
+    <div class="body-text">
+      <p>方案 A 把平台分为四层，自上而下是战略、业务、项目和执行。目标从战略一层往下传，成绩从执行一层往上汇总。每一层都有负责的人，也有起草内容的 AI。</p>
+    </div>
+    <figure>
+      <div class="fig-box">
+        <svg class="dg" viewBox="0 0 1000 532" role="img" aria-label="方案 A 总体架构：战略、业务、项目、执行四层。目标自上而下从战略方向传到事务，成绩自下而上汇总到方向目标。左侧是各层负责的人，右侧是各层起草内容的 AI。">
+          <defs>
+            <marker id="m2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+            <marker id="m2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-a"/></marker>
+            <marker id="m2o" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-ok"/></marker>
+          </defs>
+          <text class="t-col" x="215" y="20" text-anchor="middle">人</text>
+          <text class="t-col" x="460" y="20" text-anchor="middle">目标往下</text>
+          <text class="t-col" x="650" y="20" text-anchor="middle">成绩往上</text>
+          <text class="t-col" x="850" y="20" text-anchor="middle">AI</text>
+
+          <rect class="band" x="8" y="30" width="984" height="120" rx="10"/>
+          <rect class="band" x="8" y="154" width="984" height="120" rx="10"/>
+          <rect class="band" x="8" y="278" width="984" height="120" rx="10"/>
+          <rect class="band" x="8" y="402" width="984" height="120" rx="10"/>
+          <text class="t-head" x="24" y="86">战略</text>
+          <text class="t-sub" x="24" y="108">战略方向文档</text>
+          <text class="t-head" x="24" y="210">业务</text>
+          <text class="t-sub" x="24" y="232">取代项目集</text>
+          <text class="t-head" x="24" y="334">项目</text>
+          <text class="t-sub" x="24" y="356">只有一种项目</text>
+          <text class="t-head" x="24" y="458">执行</text>
+          <text class="t-sub" x="24" y="480">每 30 天一轮</text>
+
+          <rect class="box" x="130" y="42" width="170" height="96" rx="8"/>
+          <text class="t-title" x="146" y="70">战略负责人</text>
+          <text class="t-sub" x="146" y="94">对每日更新提意见</text>
+          <text class="t-sub" x="146" y="116">分管若干业务</text>
+          <rect class="box" x="130" y="166" width="170" height="96" rx="8"/>
+          <text class="t-title" x="146" y="194">业务负责人</text>
+          <text class="t-sub" x="146" y="218">人员名单、立项审核</text>
+          <text class="t-sub" x="146" y="240">批准结项、接收知照单</text>
+          <rect class="box" x="130" y="290" width="170" height="96" rx="8"/>
+          <text class="t-title" x="146" y="318">项目主创</text>
+          <text class="t-sub" x="146" y="342">维护项目目标</text>
+          <text class="t-sub" x="146" y="364">逐条决定复盘单</text>
+          <rect class="box" x="130" y="414" width="170" height="96" rx="8"/>
+          <text class="t-title" x="146" y="442">项目成员</text>
+          <text class="t-sub" x="146" y="466">在所属业务的项目里</text>
+          <text class="t-sub" x="146" y="488">接单执行事务</text>
+
+          <rect class="box" x="330" y="42" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="67">战略方向</text><text class="t-num" x="574" y="67" text-anchor="end">14 个</text>
+          <line class="conn" x1="460" y1="82" x2="460" y2="103" marker-end="url(#m2)"/>
+          <text class="t-edge" x="468" y="97">定</text>
+          <rect class="box" x="330" y="104" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="129">方向目标</text><text class="t-num" x="574" y="129" text-anchor="end">79 条</text>
+          <line class="conn a" x1="460" y1="144" x2="460" y2="165" marker-end="url(#m2a)"/>
+          <text class="t-edge t-a w600" x="468" y="159">由业务承接</text>
+          <rect class="box new" x="330" y="166" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="191">业务</text><text class="t-sub" x="574" y="191" text-anchor="end">43 项 · 范围边界</text>
+          <line class="conn" x1="460" y1="206" x2="460" y2="227" marker-end="url(#m2)"/>
+          <text class="t-edge" x="468" y="221">定</text>
+          <rect class="box goal" x="330" y="228" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="253">业务目标</text><text class="t-num" x="574" y="253" text-anchor="end">192 条</text>
+          <line class="conn a" x1="460" y1="268" x2="460" y2="289" marker-end="url(#m2a)"/>
+          <text class="t-edge t-a w600" x="468" y="283">由项目承接</text>
+          <rect class="box new" x="330" y="290" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="315">项目</text><text class="t-sub" x="574" y="315" text-anchor="end">理想化状态 · 核心价值 · 目标用户</text>
+          <line class="conn" x1="460" y1="330" x2="460" y2="351" marker-end="url(#m2)"/>
+          <text class="t-edge" x="468" y="345">写出</text>
+          <rect class="box" x="330" y="352" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="377">中短期目标</text><text class="t-sub" x="574" y="377" text-anchor="end">90 天 · 带衡量方式</text>
+          <line class="conn" x1="460" y1="392" x2="460" y2="413" marker-end="url(#m2)"/>
+          <text class="t-edge" x="468" y="407">按版本拆出</text>
+          <rect class="box" x="330" y="414" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="439">版本</text><text class="t-sub" x="574" y="439" text-anchor="end">30 天 · 阶段结项目标</text>
+          <line class="conn" x1="460" y1="454" x2="460" y2="475" marker-end="url(#m2)"/>
+          <text class="t-edge" x="468" y="469">拆成事务</text>
+          <rect class="box" x="330" y="476" width="260" height="40" rx="8"/>
+          <text class="t-title" x="346" y="501">事务</text><text class="t-sub" x="574" y="501" text-anchor="end">项目成员接单</text>
+
+          <line class="conn ok" x1="612" y1="512" x2="612" y2="48" marker-end="url(#m2o)"/>
+          <text class="t-edge t-ok w600" x="622" y="94">方向目标进度</text>
+          <text class="t-edge t-ok w600" x="622" y="218">业务目标进度</text>
+          <text class="t-edge t-ok w600" x="622" y="342">中短期目标达成</text>
+          <text class="t-edge t-ok w600" x="622" y="466">版本验收</text>
+
+          <rect class="box" x="716" y="42" width="268" height="96" rx="8"/>
+          <text class="t-title" x="732" y="70">每日更新</text>
+          <text class="t-sub" x="732" y="94">AI 每天更新战略方向文档</text>
+          <text class="t-sub" x="732" y="116">人对改动提意见</text>
+          <rect class="box" x="716" y="166" width="268" height="96" rx="8"/>
+          <text class="t-title" x="732" y="194">影响分析与 AI 项目经理</text>
+          <text class="t-sub" x="732" y="218">找出受影响的业务目标和项目</text>
+          <text class="t-sub" x="732" y="240">代业务负责人先办单据</text>
+          <rect class="box" x="716" y="290" width="268" height="96" rx="8"/>
+          <text class="t-title" x="732" y="318">目标编写与复盘</text>
+          <text class="t-sub" x="732" y="342">编写师、复盘员与审核员</text>
+          <text class="t-sub" x="732" y="364">新增能力：对照业务目标</text>
+          <rect class="box" x="716" y="414" width="268" height="96" rx="8"/>
+          <text class="t-title" x="732" y="442">拆解</text>
+          <text class="t-sub" x="732" y="466">阶段结项目标拆解师</text>
+          <text class="t-sub" x="732" y="488">版本事务拆解师</text>
+        </svg>
+      </div>
+      <figcaption><span class="cap">图 2　方案 A 总体架构</span><span>中间一列是目标链：每层的目标由上一层定，由下一层承接。左侧是各层负责的人，右侧是各层起草内容的 AI。绿色箭头表示成绩自下而上汇总。</span></figcaption>
+    </figure>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">4.2</span>四层说明</h3>
+    <div class="tbl">
+      <div class="cap">表 3　四层的对象、作用和负责人</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th scope="col">层</th><th scope="col">包含的对象</th><th scope="col">作用</th><th scope="col">负责的人</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">战略</th><td>战略方向、方向目标</td><td>定公司要做的方向，以及每个方向要达到的结果</td><td>战略负责人</td></tr>
+            <tr><th scope="row">业务</th><td>业务、业务目标</td><td>承接方向目标，划定范围，组织人员</td><td>业务负责人</td></tr>
+            <tr><th scope="row">项目</th><td>项目、理想化状态、核心价值、目标用户、中短期目标</td><td>承接业务目标，定项目未来 90 天要达到的结果</td><td>项目主创</td></tr>
+            <tr><th scope="row">执行</th><td>版本、阶段结项目标、事务</td><td>每 30 天一轮交付和验收</td><td>项目主创、项目成员</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">4.3</span>结构规则</h3>
+    <ol class="olist">
+      <li>每个项目只属于一项业务，至少承接这项业务的一条业务目标。</li>
+      <li>一条业务目标可以由多个项目承接。每个项目在中短期目标里写清承接哪一部分。</li>
+      <li>项目的每条中短期目标写明支撑哪条业务目标，并带衡量方式。</li>
+      <li>业务目标没有项目承接时，AI 发起立项构想。</li>
+      <li>新项目立项必须挂在业务目标下，按这条业务目标判断立项价值。</li>
+      <li>业务和业务目标的内容以战略方向文档为准。平台只维护业务负责人和人员名单。</li>
+      <li>项目目标的调整在下一个版本开始时生效，当前版本照常验收。</li>
+    </ol>
+  </div>
+</section>
+
+<section class="chap" id="s5" aria-labelledby="s5-h">
+  <h2 id="s5-h"><span class="no">5</span>核心对象与目标链</h2>
+
+  <div class="sec">
+    <h3><span class="no">5.1</span>对象与关系</h3>
+    <div class="tbl">
+      <div class="cap">表 4　方案 A 的核心对象</div>
+      <div class="tbl-wrap">
+        <table class="objs">
+          <thead><tr><th scope="col">对象</th><th scope="col">定义</th><th scope="col">在哪里定义</th><th scope="col">负责人</th><th scope="col">数量关系</th><th scope="col">时间周期</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">战略方向</th><td>公司要做的方向，分主战场和其他板块</td><td>战略方向文档</td><td>战略负责人</td><td>14 个；每个方向有若干方向目标</td><td>随每日更新调整</td></tr>
+            <tr><th scope="row">方向目标</th><td>一个方向在期限内要达到的结果</td><td>战略方向文档</td><td>战略负责人</td><td>79 条；一条可由多项业务承接</td><td>各条自带期限</td></tr>
+            <tr><th scope="row">业务</th><td>承接方向目标的一项经营活动，写明是否成立和取舍结论</td><td>战略方向文档；负责人和人员名单在平台维护</td><td>业务负责人</td><td>43 项；每项属于一个方向</td><td>随每日更新调整</td></tr>
+            <tr><th scope="row">业务目标</th><td>一项业务在期限内要达到的结果，带衡量方式</td><td>战略方向文档</td><td>业务负责人</td><td>192 条；一条可由多个项目承接</td><td>各条自带期限</td></tr>
+            <tr><th scope="row">项目</th><td>承接业务目标的执行单位</td><td>平台立项</td><td>项目主创</td><td>只属于一项业务，承接其中一条或多条业务目标</td><td>立项到结项</td></tr>
+            <tr><th scope="row">理想化状态、核心价值、目标用户</th><td>项目的长期定义</td><td>项目主页</td><td>项目主创</td><td>每个项目一套</td><td>按复盘调整</td></tr>
+            <tr><th scope="row">中短期目标</th><td>项目未来三个月要达到的结果，每条带衡量方式</td><td>项目主页</td><td>项目主创</td><td>同一时间一个周期；每条写明支撑哪条业务目标</td><td>首个周期最多 90 天，之后每个周期正好 90 天</td></tr>
+            <tr><th scope="row">版本</th><td>一轮执行</td><td>按中短期目标排出</td><td>项目主创</td><td>一个中短期目标周期约 3 个版本</td><td>30 天</td></tr>
+            <tr><th scope="row">阶段结项目标</th><td>一个版本要交付的结果</td><td>版本</td><td>项目主创</td><td>每个版本若干条</td><td>随版本</td></tr>
+            <tr><th scope="row">事务</th><td>一件具体工作</td><td>由阶段结项目标拆出</td><td>接单的项目成员</td><td>每条阶段结项目标拆成若干事务</td><td>按事务</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">5.2</span>一条真实的目标链</h3>
+    <div class="body-text">
+      <p>下图以「AI教育」方向为例，展示方案 A 中的一条目标链。方向目标、业务和业务目标取自战略方向文档 1.0。</p>
+    </div>
+    <figure>
+      <div class="fig-box">
+        <svg class="dg" viewBox="0 0 1000 384" role="img" aria-label="一条真实的目标链：战略方向 AI教育 定方向目标「化学前置脚本」，这条方向目标由两项业务承接；业务「互动实验与教育游戏」定 4 条业务目标，前两条由项目承接，第 3 条没有项目承接，第 4 条待复核后再安排。">
+          <defs>
+            <marker id="m3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+            <marker id="m3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-a"/></marker>
+            <marker id="m3w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-warn"/></marker>
+          </defs>
+          <text class="t-col" x="68" y="22" text-anchor="middle">战略方向</text>
+          <text class="t-col" x="227" y="22" text-anchor="middle">方向目标</text>
+          <text class="t-col" x="405" y="22" text-anchor="middle">业务</text>
+          <text class="t-col" x="618" y="22" text-anchor="middle">业务目标</text>
+          <text class="t-col" x="872" y="22" text-anchor="middle">项目</text>
+
+          <rect class="box" x="12" y="162" width="112" height="88" rx="8"/>
+          <text class="t-title" x="68" y="188" text-anchor="middle">AI教育</text>
+          <text class="t-sub" x="68" y="208" text-anchor="middle">主战场</text>
+          <text class="t-sub" x="68" y="226" text-anchor="middle">9 条方向目标</text>
+          <text class="t-sub" x="68" y="242" text-anchor="middle">9 项业务</text>
+          <line class="conn" x1="124" y1="206" x2="151" y2="206" marker-end="url(#m3)"/>
+          <text class="t-edge" x="137" y="198" text-anchor="middle">定</text>
+
+          <rect class="box" x="152" y="150" width="150" height="112" rx="8"/>
+          <text class="t-title" x="227" y="176" text-anchor="middle">化学前置脚本</text>
+          <text class="t-sub" x="227" y="198" text-anchor="middle">先交付 1,000 个以上</text>
+          <text class="t-sub" x="227" y="218" text-anchor="middle">2027-06-30 前累计</text>
+          <text class="t-sub" x="227" y="238" text-anchor="middle">验收 20,000 个</text>
+          <text class="t-edge" x="227" y="284" text-anchor="middle">由两项业务承接</text>
+          <line class="conn" x1="302" y1="206" x2="316" y2="206"/>
+          <line class="conn" x1="316" y1="158" x2="316" y2="336"/>
+          <line class="conn a" x1="316" y1="158" x2="329" y2="158" marker-end="url(#m3a)"/>
+          <line class="conn" x1="316" y1="336" x2="329" y2="336" marker-end="url(#m3)"/>
+
+          <rect class="box new" x="330" y="118" width="150" height="80" rx="8"/>
+          <text class="t-title" x="405" y="146" text-anchor="middle">互动实验与教育游戏</text>
+          <text class="t-sub" x="405" y="168" text-anchor="middle">有条件成立 · 有限验证</text>
+          <text class="t-sub" x="405" y="186" text-anchor="middle">4 条业务目标</text>
+          <rect class="box muted" x="330" y="300" width="150" height="72" rx="8"/>
+          <text class="t-title" x="405" y="324" text-anchor="middle">支撑能力：教育内容</text>
+          <text class="t-title" x="405" y="343" text-anchor="middle">AI 生产线</text>
+          <text class="t-sub" x="405" y="362" text-anchor="middle">也承接这条方向目标</text>
+
+          <line class="conn" x1="480" y1="158" x2="494" y2="158"/>
+          <line class="conn" x1="494" y1="67" x2="494" y2="259"/>
+          <line class="conn" x1="494" y1="67" x2="507" y2="67" marker-end="url(#m3)"/>
+          <line class="conn" x1="494" y1="131" x2="507" y2="131" marker-end="url(#m3)"/>
+          <line class="conn" x1="494" y1="195" x2="507" y2="195" marker-end="url(#m3)"/>
+          <line class="conn" x1="494" y1="259" x2="507" y2="259" marker-end="url(#m3)"/>
+
+          <rect class="box goal" x="508" y="40" width="220" height="54" rx="8"/>
+          <text class="t-num" x="520" y="60">期限 2026-11-30</text>
+          <text class="t-sub" x="520" y="81">验收 1,000 个化学互动实验</text>
+          <rect class="box goal" x="508" y="104" width="220" height="54" rx="8"/>
+          <text class="t-num" x="520" y="124">期限 2027-01-31</text>
+          <text class="t-sub" x="520" y="145">两批学习者验证学习增量</text>
+          <rect class="box goal" x="508" y="168" width="220" height="54" rx="8"/>
+          <text class="t-num" x="520" y="188">期限 2027-01-31</text>
+          <text class="t-sub" x="520" y="209">验收 30 个化学 STEAM 学习颗粒</text>
+          <rect class="box goal" x="508" y="232" width="220" height="54" rx="8"/>
+          <text class="t-num" x="520" y="252">期限 2027-06-30</text>
+          <text class="t-sub" x="520" y="273">复核决定继续后累计 10,000 个</text>
+
+          <line class="conn a" x1="728" y1="67" x2="755" y2="67" marker-end="url(#m3a)"/>
+          <text class="t-edge t-a" x="742" y="60" text-anchor="middle">承接</text>
+          <line class="conn a" x1="728" y1="131" x2="755" y2="131" marker-end="url(#m3a)"/>
+          <text class="t-edge t-a" x="742" y="124" text-anchor="middle">承接</text>
+          <line class="conn warn dash" x1="728" y1="195" x2="755" y2="195" marker-end="url(#m3w)"/>
+          <line class="conn dash" x1="728" y1="259" x2="755" y2="259" marker-end="url(#m3)"/>
+
+          <rect class="box new" x="756" y="40" width="232" height="54" rx="8"/>
+          <text class="t-title" x="770" y="62">北大尚教授合作</text>
+          <text class="t-sub" x="770" y="82">承接第 1 条</text>
+          <rect class="box new" x="756" y="104" width="232" height="54" rx="8"/>
+          <text class="t-title" x="770" y="126">互动实验体验研发</text>
+          <text class="t-sub" x="770" y="146">承接第 2 条</text>
+          <rect class="box warn dash" x="756" y="168" width="232" height="54" rx="8"/>
+          <text class="t-title t-warn" x="770" y="190">没有项目承接</text>
+          <text class="t-sub" x="770" y="210">AI 发起立项构想</text>
+          <rect class="box muted" x="756" y="232" width="232" height="54" rx="8"/>
+          <text class="t-title" x="770" y="254">复核决定继续后</text>
+          <text class="t-sub" x="770" y="274">再安排项目承接</text>
+        </svg>
+      </div>
+      <figcaption><span class="cap">图 3　一条真实的目标链：AI教育 → 化学前置脚本 → 互动实验与教育游戏</span><span>方向目标「化学前置脚本」由两项业务承接，图中展开其中一项。项目与业务目标的对应为示意：1.0 只写到项目属于哪项业务。这项业务的项目清单里还有 Open-Q-教育游戏、游戏化互动实验室AI研发生产线，图中未画。</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="chap" id="s6" aria-labelledby="s6-h">
+  <h2 id="s6-h"><span class="no">6</span>运行机制</h2>
+
+  <div class="sec">
+    <h3><span class="no">6.1</span>目标往下，成绩往上</h3>
+    <div class="flows">
+      <div class="flow">
+        <div class="flow-head"><i style="background:var(--a)"></i>目标往下</div>
+        <ol>
+          <li><span>方向目标</span></li><li><span>业务目标</span></li><li><span>中短期目标</span></li><li><span>阶段结项目标</span></li><li><span>事务</span></li>
+        </ol>
+        <p>每一层由 AI 起草，人决定。每一层只承接上一层的目标，不跨层承接。</p>
+      </div>
+      <div class="flow up">
+        <div class="flow-head"><i style="background:var(--ok)"></i>成绩往上</div>
+        <ol>
+          <li><span>事务验收</span></li><li><span>版本验收</span></li><li><span>中短期目标核对</span></li><li><span>业务目标进度</span></li><li><span>方向目标进度</span></li>
+        </ol>
+        <p>中短期目标按衡量方式核对。一条业务目标由多个项目承接时，进度汇总所有承接项目的成绩。</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">6.2</span>战略调整的传导</h3>
+    <div class="body-text">
+      <p>战略方向文档每天更新。改动涉及目标或取舍结论时，AI 找出受影响的业务目标和项目，按三种情况发出单据。人只在单据上做判断。</p>
+    </div>
+    <figure>
+      <div class="fig-box">
+        <svg class="dg" viewBox="0 0 900 366" role="img" aria-label="战略调整的传导：每日更新经 AI 影响分析分成调整、新立项、结项三路，分别发出中短期目标复盘单、立项构想和结项提案；业务负责人同时收到知照单。">
+          <defs>
+            <marker id="m4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+          </defs>
+          <rect class="box muted" x="16" y="40" width="160" height="56" rx="8"/>
+          <text class="t-sub" x="96" y="63" text-anchor="middle">只补依据、改措辞</text>
+          <text class="t-title" x="96" y="84" text-anchor="middle">不传导</text>
+          <line class="conn dash" x1="96" y1="160" x2="96" y2="99" marker-end="url(#m4)"/>
+          <rect class="box" x="16" y="160" width="160" height="70" rx="8"/>
+          <text class="t-title" x="96" y="190" text-anchor="middle">每日更新</text>
+          <text class="t-sub" x="96" y="212" text-anchor="middle">战略方向文档</text>
+          <line class="conn" x1="176" y1="195" x2="234" y2="195" marker-end="url(#m4)"/>
+          <text class="t-edge" x="205" y="186" text-anchor="middle">改到目标</text>
+          <rect class="box new" x="236" y="160" width="150" height="70" rx="8"/>
+          <text class="t-title" x="311" y="190" text-anchor="middle">AI 影响分析</text>
+          <text class="t-sub" x="311" y="212" text-anchor="middle">找出受影响的项目</text>
+          <line class="conn dash" x1="311" y1="230" x2="311" y2="280" marker-end="url(#m4)"/>
+          <text class="t-edge" x="319" y="260">同时</text>
+          <rect class="box" x="236" y="282" width="150" height="70" rx="8"/>
+          <text class="t-title" x="311" y="311" text-anchor="middle">业务负责人</text>
+          <text class="t-sub" x="311" y="333" text-anchor="middle">收到知照单，可提意见</text>
+
+          <line class="conn" x1="386" y1="195" x2="414" y2="195"/>
+          <line class="conn" x1="414" y1="70" x2="414" y2="320"/>
+          <line class="conn" x1="414" y1="70" x2="442" y2="70" marker-end="url(#m4)"/>
+          <line class="conn" x1="414" y1="195" x2="442" y2="195" marker-end="url(#m4)"/>
+          <line class="conn" x1="414" y1="320" x2="442" y2="320" marker-end="url(#m4)"/>
+
+          <rect class="chip-a" x="444" y="14" width="44" height="20" rx="10"/>
+          <text class="t-chip t-a" x="466" y="28" text-anchor="middle">调整</text>
+          <rect class="box" x="444" y="40" width="136" height="60" rx="8"/>
+          <text class="t-title" x="512" y="66" text-anchor="middle">中短期目标复盘单</text>
+          <text class="t-sub" x="512" y="86" text-anchor="middle">发给受影响项目</text>
+          <line class="conn" x1="580" y1="70" x2="598" y2="70" marker-end="url(#m4)"/>
+          <rect class="box" x="600" y="40" width="136" height="60" rx="8"/>
+          <text class="t-title" x="668" y="66" text-anchor="middle">项目主创逐条决定</text>
+          <text class="t-sub" x="668" y="86" text-anchor="middle">AI 项目经理可先办</text>
+          <line class="conn" x1="736" y1="70" x2="754" y2="70" marker-end="url(#m4)"/>
+          <rect class="box ok" x="756" y="40" width="136" height="60" rx="8"/>
+          <text class="t-title" x="824" y="66" text-anchor="middle">下一个版本</text>
+          <text class="t-sub" x="824" y="86" text-anchor="middle">开始时生效</text>
+
+          <rect class="chip-n" x="444" y="139" width="56" height="20" rx="10"/>
+          <text class="t-chip t-ok" x="472" y="153" text-anchor="middle">新立项</text>
+          <rect class="box" x="444" y="165" width="136" height="60" rx="8"/>
+          <text class="t-title" x="512" y="191" text-anchor="middle">业务目标</text>
+          <text class="t-sub" x="512" y="211" text-anchor="middle">没有项目承接</text>
+          <line class="conn" x1="580" y1="195" x2="598" y2="195" marker-end="url(#m4)"/>
+          <rect class="box" x="600" y="165" width="136" height="60" rx="8"/>
+          <text class="t-title" x="668" y="191" text-anchor="middle">AI 发起立项构想</text>
+          <text class="t-sub" x="668" y="211" text-anchor="middle">挂在这条业务目标下</text>
+          <line class="conn" x1="736" y1="195" x2="754" y2="195" marker-end="url(#m4)"/>
+          <rect class="box ok" x="756" y="165" width="136" height="60" rx="8"/>
+          <text class="t-title" x="824" y="191" text-anchor="middle">立项流程</text>
+          <text class="t-sub" x="824" y="211" text-anchor="middle">业务负责人参与审核</text>
+
+          <rect class="chip-c" x="444" y="264" width="44" height="20" rx="10"/>
+          <text class="t-chip t-warn" x="466" y="278" text-anchor="middle">结项</text>
+          <rect class="box" x="444" y="290" width="136" height="60" rx="8"/>
+          <text class="t-title" x="512" y="316" text-anchor="middle">业务取舍结论</text>
+          <text class="t-sub" x="512" y="336" text-anchor="middle">改为「退出」</text>
+          <line class="conn" x1="580" y1="320" x2="598" y2="320" marker-end="url(#m4)"/>
+          <rect class="box" x="600" y="290" width="136" height="60" rx="8"/>
+          <text class="t-title" x="668" y="316" text-anchor="middle">结项提案</text>
+          <text class="t-sub" x="668" y="336" text-anchor="middle">原因：业务目标不符</text>
+          <line class="conn" x1="736" y1="320" x2="754" y2="320" marker-end="url(#m4)"/>
+          <rect class="box ok" x="756" y="290" width="136" height="60" rx="8"/>
+          <text class="t-title" x="824" y="316" text-anchor="middle">业务负责人批准</text>
+          <text class="t-sub" x="824" y="336" text-anchor="middle">项目主创确认</text>
+        </svg>
+      </div>
+      <figcaption><span class="cap">图 4　战略调整的传导</span><span>三路单据都进个人工作台。业务负责人不卡在中间：业务目标照常生效，业务负责人有不同意见时提出，由 AI 修正。</span></figcaption>
+    </figure>
+    <ul class="olist" style="list-style:disc">
+      <li>只有改到方向目标、业务取舍结论或业务目标时才传导。只补依据或改措辞的，不传导。</li>
+      <li>业务目标随每日更新直接生效。业务负责人收到知照单，有不同意见时提出。</li>
+      <li>同一项目在一个版本内收到的多处改动，合并成一张单据。</li>
+      <li>项目目标的调整在下一个版本开始时生效，当前版本照常验收。</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">6.3</span>AI 重写项目目标</h3>
+    <div class="body-text">
+      <p>AI 对照业务目标和项目原有信息，写出项目未来三个月的中短期目标和理想化状态调整建议，发成复盘单，由项目主创逐条决定。</p>
+    </div>
+    <figure>
+      <div class="fig-box">
+        <svg class="dg" viewBox="0 0 900 362" role="img" aria-label="AI 重写项目目标：四类输入进入「对照业务目标」能力，再由复盘员写出建议，发成中短期目标复盘单和理想化状态复盘单；项目主创决定后，AI 拆出下一版本的阶段结项目标。">
+          <defs>
+            <marker id="m5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+          </defs>
+          <text class="t-col" x="136" y="20" text-anchor="middle">输入</text>
+          <text class="t-col" x="450" y="20" text-anchor="middle">AI 员工</text>
+          <text class="t-col" x="764" y="20" text-anchor="middle">单据与结果</text>
+
+          <rect class="box goal" x="16" y="34" width="240" height="56" rx="8"/>
+          <text class="t-title" x="32" y="57">方向目标、业务目标</text>
+          <text class="t-sub" x="32" y="78">含衡量方式和期限</text>
+          <rect class="box" x="16" y="100" width="240" height="56" rx="8"/>
+          <text class="t-title" x="32" y="123">项目原有信息</text>
+          <text class="t-sub" x="32" y="144">立项表单、理想化状态、核心价值等</text>
+          <rect class="box" x="16" y="166" width="240" height="56" rx="8"/>
+          <text class="t-title" x="32" y="189">执行记录</text>
+          <text class="t-sub" x="32" y="210">历次版本验收、重要交付物、费用</text>
+          <rect class="box" x="16" y="232" width="240" height="56" rx="8"/>
+          <text class="t-title" x="32" y="255">外部调研</text>
+          <text class="t-sub" x="32" y="276">信息全景图、竞品分析</text>
+          <line class="conn" x1="256" y1="62" x2="292" y2="62"/>
+          <line class="conn" x1="256" y1="128" x2="292" y2="128"/>
+          <line class="conn" x1="256" y1="194" x2="292" y2="194"/>
+          <line class="conn" x1="256" y1="260" x2="292" y2="260"/>
+          <line class="conn" x1="292" y1="62" x2="292" y2="260"/>
+          <line class="conn" x1="292" y1="112" x2="328" y2="112" marker-end="url(#m5)"/>
+
+          <rect class="box muted" x="330" y="34" width="240" height="34" rx="8"/>
+          <text class="t-sub" x="450" y="56" text-anchor="middle">首次挂靠 · 业务目标变化 · 周期到期</text>
+          <line class="conn" x1="450" y1="68" x2="450" y2="77" marker-end="url(#m5)"/>
+          <rect class="box new" x="330" y="78" width="240" height="72" rx="8"/>
+          <text class="t-title" x="346" y="101">对照业务目标</text>
+          <text class="t-sub" x="346" y="121">新增能力：判断项目承接哪条业务目标</text>
+          <text class="t-sub" x="346" y="139">还该不该继续做</text>
+          <line class="conn" x1="450" y1="150" x2="450" y2="176" marker-end="url(#m5)"/>
+          <rect class="box" x="330" y="178" width="240" height="94" rx="8"/>
+          <text class="t-title" x="346" y="201">复盘员与复盘审核员</text>
+          <text class="t-sub" x="346" y="221">现有 AI 员工</text>
+          <text class="t-sub" x="346" y="240">对中短期目标、理想化状态</text>
+          <text class="t-sub" x="346" y="259">逐条给出保留、改写、删除、新增</text>
+
+          <line class="conn" x1="570" y1="214" x2="642" y2="70" marker-end="url(#m5)"/>
+          <line class="conn" x1="570" y1="226" x2="642" y2="136" marker-end="url(#m5)"/>
+          <rect class="box" x="644" y="40" width="240" height="56" rx="8"/>
+          <text class="t-title" x="660" y="63">中短期目标复盘单</text>
+          <text class="t-sub" x="660" y="84">未来三个月，每条带衡量方式</text>
+          <rect class="box" x="644" y="106" width="240" height="56" rx="8"/>
+          <text class="t-title" x="660" y="129">理想化状态复盘单</text>
+          <text class="t-sub" x="660" y="150">保留、改写、删除、新增</text>
+          <line class="conn" x1="764" y1="162" x2="764" y2="194" marker-end="url(#m5)"/>
+          <rect class="box" x="644" y="196" width="240" height="60" rx="8"/>
+          <text class="t-title" x="660" y="220">项目主创逐条决定</text>
+          <text class="t-sub" x="660" y="241">AI 项目经理在代办范围内先办</text>
+          <line class="conn" x1="764" y1="256" x2="764" y2="288" marker-end="url(#m5)"/>
+          <rect class="box ok" x="644" y="290" width="240" height="60" rx="8"/>
+          <text class="t-title" x="660" y="314">下一版本的阶段结项目标</text>
+          <text class="t-sub" x="660" y="335">由 AI 从本项目的中短期目标拆出</text>
+        </svg>
+      </div>
+      <figcaption><span class="cap">图 5　AI 重写项目目标</span><span>沿用现有的复盘单。新增两点：复盘单可以因业务目标变化等原因自动发起；AI 员工增加「对照业务目标」能力。</span></figcaption>
+    </figure>
+    <ul class="olist" style="list-style:disc">
+      <li>三个时机：项目第一次挂到业务目标时，业务目标变化时，中短期目标周期到期时。</li>
+      <li>输入包括方向目标和业务目标、项目原有信息、执行记录和外部调研。外部调研使用 AI 需求工程已有的信息全景图和竞品分析。</li>
+      <li>每条中短期目标带衡量方式，并写明支撑哪条业务目标。</li>
+      <li>项目主创逐条采纳。不同意时，在「与 AI 的修改对话」里写意见，AI 重出。AI 项目经理在代办范围内先办，再发知照单给项目主创。</li>
+      <li>AI 判断项目不该再做时，在复盘单的总评里写明，转为结项提案。复盘单本身不结项。</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">6.4</span>时间节奏</h3>
+    <div class="body-text">
+      <p>方案 A 有四种时间节奏：战略方向文档每天更新，业务目标各有期限，项目按 90 天写中短期目标，每 30 天一个版本。</p>
+    </div>
+    <figure>
+      <div class="fig-box">
+        <svg class="dg" viewBox="0 0 960 262" role="img" aria-label="四种时间节奏：每日更新连续发生；业务目标的期限分别在 2026-11-30、2027-01-31 和 2027-06-30；中短期目标每 90 天一个周期；版本每 30 天一个。">
+          <line class="axis" x1="150" y1="40" x2="940" y2="40"/>
+          <line class="grid" x1="150" y1="40" x2="150" y2="252"/>
+          <line class="grid" x1="247.9" y1="40" x2="247.9" y2="252"/>
+          <line class="grid" x1="349.1" y1="40" x2="349.1" y2="252"/>
+          <line class="grid" x1="450.3" y1="40" x2="450.3" y2="252"/>
+          <line class="grid" x1="541.7" y1="40" x2="541.7" y2="252"/>
+          <line class="grid" x1="642.9" y1="40" x2="642.9" y2="252"/>
+          <line class="grid" x1="740.9" y1="40" x2="740.9" y2="252"/>
+          <line class="grid" x1="842.1" y1="40" x2="842.1" y2="252"/>
+          <line class="grid" x1="940" y1="40" x2="940" y2="252"/>
+          <text class="t-num" x="150" y="30" text-anchor="middle">2026-11</text>
+          <text class="t-num" x="247.9" y="30" text-anchor="middle">2026-12</text>
+          <text class="t-num" x="349.1" y="30" text-anchor="middle">2027-01</text>
+          <text class="t-num" x="450.3" y="30" text-anchor="middle">2027-02</text>
+          <text class="t-num" x="541.7" y="30" text-anchor="middle">2027-03</text>
+          <text class="t-num" x="642.9" y="30" text-anchor="middle">2027-04</text>
+          <text class="t-num" x="740.9" y="30" text-anchor="middle">2027-05</text>
+          <text class="t-num" x="842.1" y="30" text-anchor="middle">2027-06</text>
+          <text class="t-num" x="940" y="30" text-anchor="end">2027-07</text>
+
+          <text class="t-title" x="16" y="78">每日更新</text>
+          <line class="daily" x1="150" y1="74" x2="940" y2="74"/>
+
+          <text class="t-title" x="16" y="132">业务目标期限</text>
+          <polygon class="ms" points="244.7,120 252.7,128 244.7,136 236.7,128"/>
+          <text class="t-sub" x="258" y="132">第 1 条</text>
+          <polygon class="ms" points="447.1,120 455.1,128 447.1,136 439.1,128"/>
+          <text class="t-sub" x="461" y="132">第 2、3 条</text>
+          <polygon class="ms" points="936.7,120 944.7,128 936.7,136 928.7,128"/>
+          <text class="t-sub" x="922" y="132" text-anchor="end">第 4 条</text>
+
+          <text class="t-title" x="16" y="186">中短期目标</text>
+          <rect class="bar-a" x="150" y="171" width="292.8" height="22" rx="4"/>
+          <text class="t-sub" x="160" y="186">周期 1：2026-11-01 至 2027-01-29</text>
+          <rect class="bar-a" x="444.8" y="171" width="292.8" height="22" rx="4"/>
+          <text class="t-sub" x="454.8" y="186">周期 2：2027-01-30 至 2027-04-29</text>
+          <rect class="bar-a" x="739.6" y="171" width="200.4" height="22" rx="4"/>
+          <text class="t-sub" x="749.6" y="186">周期 3：2027-04-30 起</text>
+
+          <text class="t-title" x="16" y="240">版本</text>
+          <rect class="bar-v" x="150" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="198" y="240" text-anchor="middle">1</text>
+          <rect class="bar-v" x="247.9" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="295.9" y="240" text-anchor="middle">2</text>
+          <rect class="bar-v" x="345.9" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="393.9" y="240" text-anchor="middle">3</text>
+          <rect class="bar-v" x="443.8" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="491.8" y="240" text-anchor="middle">4</text>
+          <rect class="bar-v" x="541.7" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="589.7" y="240" text-anchor="middle">5</text>
+          <rect class="bar-v" x="639.7" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="687.7" y="240" text-anchor="middle">6</text>
+          <rect class="bar-v" x="737.6" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="785.6" y="240" text-anchor="middle">7</text>
+          <rect class="bar-v" x="835.5" y="227" width="95.9" height="18" rx="3"/><text class="t-num" x="883.5" y="240" text-anchor="middle">8</text>
+        </svg>
+      </div>
+      <figcaption><span class="cap">图 6　四种时间节奏（以「互动实验与教育游戏」为例）</span><span>业务目标的期限各不相同。项目按 90 天写中短期目标，每个周期 3 个版本，每个版本 30 天。每日更新改到业务目标时，项目目标在下一个版本开始时调整。</span></figcaption>
+    </figure>
+    <div class="body-text">
+      <p>中短期目标的周期不必与业务目标的期限对齐。每条中短期目标写明支撑哪条业务目标，以及在本周期内完成多少。</p>
+    </div>
+  </div>
+</section>
+
+<section class="chap" id="s7" aria-labelledby="s7-h">
+  <h2 id="s7-h"><span class="no">7</span>组织与角色</h2>
+
+  <div class="sec">
+    <h3><span class="no">7.1</span>角色与职责</h3>
+    <div class="tbl">
+      <div class="cap">表 5　方案 A 中的角色</div>
+      <div class="tbl-wrap">
+        <table class="roles">
+          <thead><tr><th scope="col">角色</th><th scope="col">在方案 A 中的职责</th><th scope="col">对应的现有角色</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">战略负责人</th><td>对战略方向文档的每日更新提意见。分管若干业务。</td><td>战略负责人。分管范围按业务计算。</td></tr>
+            <tr><th scope="row">业务负责人</th><td>对一项业务负责。维护人员名单，参与本业务的立项审核，批准本业务的结项提案，接收本业务目标变化的知照单。</td><td>项目集负责人，沿用其职权。</td></tr>
+            <tr><th scope="row">项目主创</th><td>对一个项目负责。维护项目的理想化状态、核心价值、目标用户和中短期目标，在复盘单上逐条决定。</td><td>母项目主创和子项目主创，合为一种。</td></tr>
+            <tr><th scope="row">项目成员</th><td>在所属业务的项目里接单，执行事务。</td><td>项目成员。所属范围从项目集改为业务。</td></tr>
+            <tr><th scope="row">AI 项目经理</th><td>代业务负责人和项目主创先办单据。人可以认可，也可以介入。</td><td>AI 项目经理。改为按业务代办。</td></tr>
+            <tr><th scope="row">AI 员工</th><td>起草各层内容：影响分析、对照业务目标、目标复盘、立项构想、拆解。</td><td>以现有 AI 员工为主，新增影响分析和对照业务目标两项能力。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">7.2</span>业务作为组织边界</h3>
+    <div class="body-text">
+      <p>业务取代项目集，成为方案 A 的组织边界。一项业务有一位业务负责人和一份人员名单。名单内的项目成员可以在这项业务的项目里接单。</p>
+      <p>业务管理页只维护业务负责人和人员名单，由业务负责人或管理层操作。业务的内容和业务目标以战略方向文档为准，业务管理页不另存一份。</p>
+      <p>一位战略负责人分管若干业务。战略负责人通过每日更新调整方向目标和业务目标，不直接改项目。</p>
+    </div>
+  </div>
+</section>
+
+<section class="chap" id="s8" aria-labelledby="s8-h">
+  <h2 id="s8-h"><span class="no">8</span>方案对比</h2>
+
+  <div class="sec">
+    <h3><span class="no">8.1</span>三种结构</h3>
+    <div class="body-text">
+      <p>下图用同一项业务的三个项目，对比现状、方案 B 和方案 A。三种结构的区别在于项目从哪里拿到上层目标。</p>
+    </div>
+    <figure>
+      <div class="fig-box">
+        <svg class="dg" viewBox="0 0 1000 392" role="img" aria-label="同一项业务在三种结构下的样子。现状：三个项目分属两个项目集，都没有连到业务目标，互动实验体验研发的目标停在中短期目标。方案 B：北大尚教授合作隔着母项目承接业务目标，互动实验体验研发作为独立项目直接承接。方案 A：三个项目都直接承接业务目标。">
+          <defs>
+            <marker id="m7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
+            <marker id="m7a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-a"/></marker>
+            <marker id="m7w" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-warn"/></marker>
+          </defs>
+          <rect class="panel-cur" x="8" y="8" width="320" height="376" rx="10"/>
+          <rect class="panel-b" x="340" y="8" width="320" height="376" rx="10"/>
+          <rect class="panel-a" x="672" y="8" width="320" height="376" rx="10"/>
+
+          <text class="t-head t-cur" x="24" y="34">现状</text>
+          <text class="t-sub" x="24" y="54">按项目集组织</text>
+          <rect class="box muted" x="20" y="66" width="296" height="44" rx="8"/>
+          <text class="t-title" x="168" y="85" text-anchor="middle">战略方向文档 1.0</text>
+          <text class="t-sub" x="168" y="102" text-anchor="middle">没有和项目连上</text>
+          <rect class="box" x="20" y="138" width="144" height="44" rx="8"/>
+          <text class="t-title" x="92" y="157" text-anchor="middle">Open-Q</text>
+          <text class="t-sub" x="92" y="174" text-anchor="middle">项目集</text>
+          <rect class="box" x="172" y="138" width="144" height="44" rx="8"/>
+          <text class="t-title" x="244" y="157" text-anchor="middle">科学互动体验AI研发</text>
+          <text class="t-sub" x="244" y="174" text-anchor="middle">项目集</text>
+          <line class="conn" x1="92" y1="182" x2="92" y2="209" marker-end="url(#m7)"/>
+          <text class="t-edge" x="100" y="200">包含</text>
+          <line class="conn" x1="244" y1="182" x2="244" y2="209" marker-end="url(#m7)"/>
+          <text class="t-edge" x="252" y="200">包含</text>
+          <rect class="box hop" x="20" y="210" width="144" height="44" rx="8"/>
+          <text class="t-title" x="92" y="229" text-anchor="middle">Open-Q-教育游戏</text>
+          <text class="t-sub" x="92" y="246" text-anchor="middle">母项目</text>
+          <rect class="box hop" x="172" y="210" width="144" height="44" rx="8"/>
+          <text class="t-title" x="244" y="229" text-anchor="middle">互动实验体验研发</text>
+          <text class="t-sub" x="244" y="246" text-anchor="middle">母项目，没有子项目</text>
+          <line class="conn" x1="92" y1="254" x2="92" y2="281" marker-end="url(#m7)"/>
+          <text class="t-edge" x="100" y="272">承接</text>
+          <line class="conn warn dash" x1="244" y1="254" x2="244" y2="281" marker-end="url(#m7w)"/>
+          <rect class="box" x="20" y="282" width="144" height="44" rx="8"/>
+          <text class="t-title" x="92" y="301" text-anchor="middle">北大尚教授合作</text>
+          <text class="t-sub" x="92" y="318" text-anchor="middle">子项目</text>
+          <rect class="box warn dash" x="172" y="282" width="144" height="44" rx="8"/>
+          <text class="t-title t-warn" x="244" y="301" text-anchor="middle">目标停在中短期目标</text>
+          <text class="t-sub" x="244" y="318" text-anchor="middle">开不出版本</text>
+          <text class="t-sub" x="24" y="356">同一项业务的项目分在两个项目集，</text>
+          <text class="t-sub" x="24" y="374">都没有连到业务目标。</text>
+
+          <text class="t-head t-b" x="356" y="34">方案 B</text>
+          <text class="t-sub" x="356" y="54">保留两层，另设独立项目</text>
+          <rect class="box goal" x="352" y="66" width="296" height="44" rx="8"/>
+          <text class="t-title" x="500" y="85" text-anchor="middle">业务目标</text>
+          <text class="t-sub" x="500" y="102" text-anchor="middle">互动实验与教育游戏</text>
+          <line class="conn a" x1="420" y1="110" x2="420" y2="137" marker-end="url(#m7a)"/>
+          <text class="t-edge t-a" x="428" y="128">承接</text>
+          <line class="conn a" x1="580" y1="110" x2="580" y2="137" marker-end="url(#m7a)"/>
+          <text class="t-edge t-a" x="588" y="128">承接</text>
+          <rect class="box hop" x="352" y="138" width="136" height="44" rx="8"/>
+          <text class="t-title" x="420" y="157" text-anchor="middle">Open-Q-教育游戏</text>
+          <text class="t-sub" x="420" y="174" text-anchor="middle">母项目</text>
+          <rect class="box new" x="512" y="138" width="136" height="44" rx="8"/>
+          <text class="t-title" x="580" y="157" text-anchor="middle">互动实验体验研发</text>
+          <text class="t-sub" x="580" y="174" text-anchor="middle">独立项目</text>
+          <line class="conn" x1="420" y1="182" x2="420" y2="209" marker-end="url(#m7)"/>
+          <text class="t-edge" x="428" y="200">承接中短期目标</text>
+          <rect class="box" x="352" y="210" width="136" height="44" rx="8"/>
+          <text class="t-title" x="420" y="229" text-anchor="middle">北大尚教授合作</text>
+          <text class="t-sub" x="420" y="246" text-anchor="middle">子项目</text>
+          <text class="t-sub t-warn" x="352" y="278">Open-Q-教育游戏的另 3 个子项目</text>
+          <text class="t-sub t-warn" x="352" y="296">不在这项业务里</text>
+          <text class="t-sub" x="356" y="356">子项目隔着母项目承接业务目标，</text>
+          <text class="t-sub" x="356" y="374">母项目和业务的范围对不上。</text>
+
+          <text class="t-head t-a" x="688" y="34">方案 A</text>
+          <text class="t-sub" x="688" y="54">只有一种项目</text>
+          <rect class="box goal" x="684" y="66" width="296" height="44" rx="8"/>
+          <text class="t-title" x="832" y="85" text-anchor="middle">业务目标</text>
+          <text class="t-sub" x="832" y="102" text-anchor="middle">互动实验与教育游戏</text>
+          <line class="conn a" x1="700" y1="110" x2="700" y2="270"/>
+          <text class="t-edge t-a w600" x="708" y="128">直接承接</text>
+          <line class="conn a" x1="700" y1="158" x2="717" y2="158" marker-end="url(#m7a)"/>
+          <line class="conn a" x1="700" y1="214" x2="717" y2="214" marker-end="url(#m7a)"/>
+          <line class="conn a" x1="700" y1="270" x2="717" y2="270" marker-end="url(#m7a)"/>
+          <rect class="box new" x="718" y="136" width="262" height="44" rx="8"/>
+          <text class="t-title" x="732" y="163">北大尚教授合作</text>
+          <text class="t-sub" x="968" y="163" text-anchor="end">自有中短期目标</text>
+          <rect class="box new" x="718" y="192" width="262" height="44" rx="8"/>
+          <text class="t-title" x="732" y="219">互动实验体验研发</text>
+          <text class="t-sub" x="968" y="219" text-anchor="end">自有中短期目标</text>
+          <rect class="box new" x="718" y="248" width="262" height="44" rx="8"/>
+          <text class="t-title" x="732" y="275">Open-Q-教育游戏</text>
+          <text class="t-sub" x="968" y="275" text-anchor="end">自有中短期目标</text>
+          <text class="t-sub" x="732" y="316">每个项目自有完整目标链</text>
+          <text class="t-sub" x="688" y="356">三个项目都直接承接业务目标，</text>
+          <text class="t-sub" x="688" y="374">各自写中短期目标，按版本执行。</text>
+        </svg>
+      </div>
+      <figcaption><span class="cap">图 7　同一项业务在三种结构下的样子</span><span>三个项目都在战略方向文档 1.0 中业务「互动实验与教育游戏」的项目清单里。现状下它们分属两个项目集。方案 B 里，北大尚教授合作要经过母项目才能拿到上层目标。方案 A 里，三个项目都直接承接业务目标。</span></figcaption>
+    </figure>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">8.2</span>逐项对比</h3>
+    <div class="tbl">
+      <div class="cap">表 6　现状、方案 B 与方案 A 逐项对比</div>
+      <div class="tbl-wrap">
+        <table class="cmp">
+          <thead><tr><th scope="col">对比项</th><th scope="col"><span class="pl pl-cur">现状</span></th><th scope="col"><span class="pl pl-b">方案 B</span></th><th scope="col" class="col-a"><span class="pl pl-a">方案 A</span></th></tr></thead>
+          <tbody>
+            <tr><th scope="row">组织边界</th><td>项目集，现有 12 个</td><td>业务，43 项</td><td class="col-a">业务，43 项</td></tr>
+            <tr><th scope="row">项目种类</th><td>母项目、子项目</td><td>母项目、子项目、独立项目</td><td class="col-a">一种</td></tr>
+            <tr><th scope="row">项目的上层目标</th><td>子项目：母项目的中短期目标。母项目：没有上层目标</td><td>母项目和独立项目：业务目标。子项目：母项目的中短期目标</td><td class="col-a">业务目标</td></tr>
+            <tr><th scope="row">有理想化状态和中短期目标的项目</th><td>母项目</td><td>母项目、独立项目</td><td class="col-a">全部项目</td></tr>
+            <tr><th scope="row">按版本执行的项目</th><td>子项目</td><td>子项目、独立项目</td><td class="col-a">全部项目</td></tr>
+            <tr><th scope="row">AI 按项目重写中短期目标和理想化状态</th><td>只能写到母项目</td><td>写到母项目和独立项目，写不到子项目</td><td class="col-a">全部项目</td></tr>
+            <tr><th scope="row">业务目标变化传到项目</th><td>没有连上</td><td>独立项目直接调整；子项目要等母项目先调整</td><td class="col-a">直接调整承接项目的中短期目标</td></tr>
+            <tr><th scope="row">新项目立项挂在</th><td>项目集；子项目还要承接母项目的一条中短期目标</td><td>业务目标，或母项目的中短期目标</td><td class="col-a">业务目标</td></tr>
+            <tr><th scope="row">业务取舍结论改为「退出」时</th><td>平台不提醒</td><td>发结项提案</td><td class="col-a">发结项提案</td></tr>
+            <tr><th scope="row">成绩汇总</th><td>不汇总到业务目标和方向目标</td><td>子项目经母项目汇总到业务目标</td><td class="col-a">每个项目直接汇总到业务目标</td></tr>
+            <tr><th scope="row">人员名单</th><td>按项目集</td><td>按业务</td><td class="col-a">按业务</td></tr>
+            <tr><th scope="row">与现行规则的关系</th><td>—</td><td>保留 11 月 1 日确定的母项目、子项目两层规则</td><td class="col-a">改变这条规则</td></tr>
+            <tr><th scope="row">平台改动量</th><td>—</td><td>较小</td><td class="col-a">较大</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">8.3</span>三个项目在三种结构下</h3>
+    <div class="tbl">
+      <div class="cap">表 7　第 2 章三个项目在三种结构下的情况</div>
+      <div class="tbl-wrap">
+        <table class="cases">
+          <thead><tr><th scope="col">项目</th><th scope="col"><span class="pl pl-cur">现状</span></th><th scope="col"><span class="pl pl-b">方案 B</span></th><th scope="col" class="col-a"><span class="pl pl-a">方案 A</span></th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Open-Q 的项目</th><td>旧官网的多层项目集合并为 1 个项目集、4 个母项目。项目分属 6 项业务。</td><td>项目按所属业务承接业务目标。母子关系保留：Open-Q-教育游戏的 4 个子项目中，只有 1 个与母项目在同一项业务里。</td><td class="col-a">项目按所属业务承接业务目标。没有母子关系，也就没有归属冲突。</td></tr>
+            <tr><th scope="row">虚拟主播unreal版本</th><td>迁入时没有上级，被定成母项目，又没有子项目。目标停在中短期目标，开不出版本。</td><td>作为独立项目，直接承接业务目标，按版本执行。</td><td class="col-a">作为项目，直接承接业务目标，按版本执行。</td></tr>
+            <tr><th scope="row">北大尚教授合作</th><td>子项目。版本验收后开不出下一版本，平台每小时重试，不通知人。</td><td>仍是子项目。母项目写出可承接的中短期目标后，才能开出下一版本。</td><td class="col-a">直接承接业务「互动实验与教育游戏」的业务目标，从自己的中短期目标拆出下一版本。</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">8.4</span>比选结论</h3>
+    <div class="body-text">
+      <p>方案 B 的长处是改动小。它保留 11 月 1 日确定的两层规则，母项目继续统一规划一组子项目。</p>
+      <p>本方案选择方案 A，理由如下：</p>
+    </div>
+    <ol class="olist">
+      <li><b>AI 要为每个项目重写目标。</b>改造需求要求 AI 为各个项目重写中短期目标和理想化状态。方案 B 的子项目没有这两层。</li>
+      <li><b>立项要挂在业务目标下。</b>改造需求要求新项目挂在业务目标下。方案 B 的新子项目挂在母项目的中短期目标下。</li>
+      <li><b>不再保留集合式结构。</b>改造需求要求拿掉项目集这类集合式结构。母项目也是一组子项目的集合。</li>
+      <li><b>母项目的范围和业务对不上。</b>能在业务清单里找到的 47 个子项目中，22 个不在母项目所在的业务里。保留母子关系，就要在母项目和业务之间二选一。</li>
+    </ol>
+  </div>
+</section>
+
+<section class="chap" id="s9" aria-labelledby="s9-h">
+  <h2 id="s9-h"><span class="no">9</span>方案 A 的取舍</h2>
+
+  <div class="sec">
+    <h3><span class="no">9.1</span>收益</h3>
+    <ul class="points">
+      <li><b>项目不会因为上级没有目标而卡住。</b>每个项目直接承接业务目标，自己写中短期目标，自己拆版本。</li>
+      <li><b>战略调整一步传到项目。</b>业务目标改了，AI 直接为承接的项目写出调整建议。</li>
+      <li><b>AI 能为每个项目重写目标。</b>每个项目都有中短期目标和理想化状态，AI 可以逐个项目起草。</li>
+      <li><b>成绩可以按目标汇总。</b>一条业务目标有哪些项目承接、做到哪里，可以直接看到。</li>
+      <li><b>规则更简单。</b>项目只有一种，不再区分母项目和子项目。</li>
+    </ul>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">9.2</span>代价</h3>
+    <ol class="olist">
+      <li>改变 11 月 1 日确定的母项目、子项目两层规则。</li>
+      <li>现有 24 个在用母项目不再作为单独一层。母项目对一组子项目的统一规划，改由业务和业务目标承担，业务负责人的协调工作随之增加。</li>
+      <li>一条业务目标由多个项目承接时，每个项目要写清承接的份额，否则进度无法汇总。</li>
+      <li>平台改动面大。项目层级、承接、版本滚动、立项检查，以及十多类按项目集登记的记录都受影响。</li>
+      <li>项目范围以战略方向文档为准。文档没有写到的工作，在平台上没有可挂的业务目标。按 1.0，237 个项目中有 103 个属于明确不做；平台上另有 19 个在用项目不在 1.0 里。</li>
+    </ol>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">9.3</span>不变的内容</h3>
+    <ul class="olist" style="list-style:disc">
+      <li>战略方向文档的结构和每日更新的方式不变。</li>
+      <li>版本仍为 30 天，阶段结项目标和事务的规则不变。</li>
+      <li>中短期目标的周期规则不变：首个周期最多 90 天，之后每个周期 90 天。</li>
+      <li>复盘单、知照单和结项提案等单据的形式不变，AI 项目经理先办、人认可或介入的方式不变。</li>
+      <li>项目主创对本项目目标的决定权不变。</li>
+    </ul>
+  </div>
+</section>
+
+<section class="chap" id="appx" aria-labelledby="appx-h">
+  <h2 id="appx-h"><span class="no">附</span>术语与数据来源</h2>
+
+  <div class="sec">
+    <h3><span class="no">A</span>术语</h3>
+    <dl class="terms">
+      <dt>战略方向</dt><dd>公司要做的方向。战略方向文档 1.0 有 14 个，分为主战场和其他板块。</dd>
+      <dt>方向目标</dt><dd>一个战略方向在期限内要达到的结果。</dd>
+      <dt>业务</dt><dd>承接方向目标的一项经营活动。战略方向文档为每项业务写明是否成立和取舍结论。</dd>
+      <dt>业务目标</dt><dd>一项业务在期限内要达到的结果，带衡量方式。</dd>
+      <dt>是否成立</dt><dd>战略方向文档对一项业务的判断。取值为成立、有条件成立、不成立。</dd>
+      <dt>取舍结论</dt><dd>战略方向文档对一项业务的投入决定。取值为重点投入、保留、调整、有限验证、退出。</dd>
+      <dt>衡量方式</dt><dd>判断一条目标是否达成的方法和标准。</dd>
+      <dt>每日更新</dt><dd>AI 每天按新信息更新战略方向文档，人对改动提意见。</dd>
+      <dt>项目</dt><dd>承接业务目标的执行单位。</dd>
+      <dt>理想化状态</dt><dd>项目长期要达到的状态。</dd>
+      <dt>核心价值</dt><dd>项目给目标用户带来的主要价值。</dd>
+      <dt>目标用户</dt><dd>项目服务的人群。</dd>
+      <dt>中短期目标</dt><dd>项目在一个时间周期内要达到的结果。首个周期最多 90 天，之后每个周期 90 天。</dd>
+      <dt>版本</dt><dd>项目的一轮执行。每个版本 30 天。</dd>
+      <dt>阶段结项目标</dt><dd>一个版本要交付的结果。</dd>
+      <dt>事务</dt><dd>一件具体工作，由项目成员接单执行。</dd>
+      <dt>人员名单</dt><dd>一项业务的成员名单。名单内的人可以在这项业务的项目里接单。</dd>
+      <dt>复盘单</dt><dd>AI 写出目标调整建议、由项目主创逐条决定的单据。</dd>
+      <dt>知照单</dt><dd>告知一项决定或变化的单据。收件人可以认可，也可以提出意见。</dd>
+      <dt>结项提案</dt><dd>建议项目结项的单据。</dd>
+      <dt>立项构想</dt><dd>新项目的初步设想。经立项流程审核通过后成为项目。</dd>
+      <dt>项目集、母项目、子项目</dt><dd>现有结构的三层。方案 A 不再使用。</dd>
+    </dl>
+  </div>
+
+  <div class="sec">
+    <h3><span class="no">B</span>数据来源</h3>
+    <ol class="src">
+      <li>战略方向文档 1.0：2026 年 11 月 2 日导入平台。方向、方向目标、业务、业务目标的数量和内容，以及各项业务的项目清单，取自这一版本。1.0 的项目清单从旧官网筛出：正式立项、执行中，并属于教育业务或非游业务，共 237 个。</li>
+      <li>平台项目快照：2026 年 10 月 29 日的生产数据。在用项目、母项目、子项目和项目集的数量与归属，取自这份快照。项目是否已在平台上，按项目编号与这份快照匹配。快照之后新建、结项或迁入的项目没有计入。</li>
+      <li>平台现行规则：中短期目标的周期、承接和复盘单的规则，取自平台当前版本。</li>
+      <li>项目与业务的对应：按 1.0 每项业务列出的项目清单匹配。1.0 写到项目属于哪项业务，没有写到项目承接哪条业务目标。图 3 中项目与业务目标的对应为示意。</li>
+    </ol>
+  </div>
+  <p class="endnote">数据截至 2026 年 11 月 2 日（战略方向文档 1.0）和 2026 年 10 月 29 日（平台项目快照）。</p>
+</section>
+
+</main>
+</div>
+</body>
+</html>
