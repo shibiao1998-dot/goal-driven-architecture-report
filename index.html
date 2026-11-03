@@ -48,20 +48,20 @@
 }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
-body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 15.5px; line-height: 1.8; -webkit-font-smoothing: antialiased; }
+body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 16px; line-height: 1.8; -webkit-font-smoothing: antialiased; }
 p { margin: 0; }
 a { color: var(--a); }
 h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
-.layout { max-width: 1240px; margin: 0 auto; padding: 32px 24px 80px; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 32px; align-items: start; }
+.layout { max-width: 1560px; margin: 0 auto; padding: 28px 24px 80px; display: grid; grid-template-columns: 188px minmax(0, 1fr); gap: 28px; align-items: start; }
 .toc-side { position: sticky; top: 24px; font-size: 13.5px; }
 .toc-side .toc-title { font-size: 12px; color: var(--ink-3); letter-spacing: .08em; margin-bottom: 8px; }
 .toc-side ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
 .toc-side a { display: grid; grid-template-columns: 22px minmax(0, 1fr); padding: 5px 8px; border-radius: 6px; color: var(--ink-2); text-decoration: none; }
 .toc-side a:hover { background: var(--paper); color: var(--ink); }
 .toc-side a span:first-child { font-family: var(--mono); color: var(--ink-3); }
-.paper { background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 56px 64px 64px; min-width: 0; display: flex; flex-direction: column; gap: 56px; }
+.paper { background: var(--paper); border: 1px solid var(--rule); border-radius: 6px; padding: 48px 56px 60px; min-width: 0; display: flex; flex-direction: column; gap: 56px; }
 
 /* 封面 */
 .cover { display: flex; flex-direction: column; gap: 14px; padding-bottom: 32px; border-bottom: 2px solid var(--ink); }
@@ -113,7 +113,7 @@ h1, h2, h3, h4 { margin: 0; text-wrap: balance; }
 .tbl { display: flex; flex-direction: column; gap: 8px; }
 .tbl .cap, figcaption .cap { font-size: 13.5px; font-weight: 700; color: var(--ink); }
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 8px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.7; }
+table { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.7; }
 th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--rule); }
 thead th { font-size: 12.5px; font-weight: 600; color: var(--ink-3); background: var(--paper-2); white-space: nowrap; }
 tbody tr:last-child td, tbody tr:last-child th { border-bottom: 0; }
